@@ -1,6 +1,6 @@
-# persona-api
+# Phersu-api
 
-PersonaDough 與 PsychAnchor 的 HTTP/SSE 整合入口。
+Phersu-api 是 PersonaDough 與 PsychAnchor 的 HTTP/SSE 整合入口。
 
 ## 職責
 
@@ -13,7 +13,9 @@ PersonaDough 與 PsychAnchor 的 HTTP/SSE 整合入口。
 
 ## 執行
 
-需要 Python 3.10+，三個 repo 放在相鄰目錄。此版對應 PersonaDough 的 `refactor/repository-split` 與 PsychAnchor 的 `refactor/extract-anchoring` 分支；取得方法見 [主導覽](https://github.com/llm-psychology/persona-platform)。
+需要 Python 3.10+，三個 repo 放在相鄰目錄。此版對應 PersonaDough 的 `refactor/repository-split` 與 PsychAnchor 的 `refactor/extract-anchoring` 分支；取得方法見 [Phersu 主導覽](https://github.com/llm-psychology/Phersu)。
+
+GitHub repo 名稱為 `Phersu-api`；本地資料夾沿用 `persona-api`，Python 發行套件名稱仍為 `persona-api`，import 名稱為 `persona_api`。repo 更名不影響以下執行方式。
 
 ```powershell
 python -m pip install -e ../PersonaDough -e ../PsychAnchor -e .
