@@ -64,3 +64,30 @@ def test_generation_does_not_automatically_create_interview(client, monkeypatch)
     assert response.status_code == 200
     assert response.json()["persona_ids"] == ["0000000001", "0000000002"]
     assert interview.await_count == 0
+
+
+def test_sse_keeps_events_when_next_tick_has_fewer_events(client):
+    import asyncio
+    from persona_api import app as module
+
+    async def run():
+        state = {"tick": 1, "status": "running", "events": ["first", "second"]}
+        module.active_simulations["stream-regression"] = state
+        response = await module.get_simulation_stream("stream-regression")
+        stream = response.body_iterator
+        try:
+            assert "event: connected" in await anext(stream)
+            assert '"first"' in await anext(stream)
+            state.update(tick=2, events=["third"])
+            update = await anext(stream)
+            assert '"third"' in update
+            state.update(status="paused")
+            assert '"paused"' in await anext(stream)
+            state.update(status="completed", finished=True, final_stats={"total_agents": 3})
+            assert '"total_agents": 3' in await anext(stream)
+            assert "event: simulation_ended" in await anext(stream)
+        finally:
+            await stream.aclose()
+            module.active_simulations.pop("stream-regression", None)
+
+    asyncio.run(run())

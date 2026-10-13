@@ -1984,9 +1984,9 @@
 
         // 5. 系統技術指標
         function generateTechnicalMetrics(stats) {
-            const startTime = performance.now(); // 簡化：使用當前時間
+            const elapsedSeconds = stats.simulation_time;
             const totalTicks = stats.total_ticks || 0;
-            const avgTPS = totalTicks > 0 ? (totalTicks / (Date.now() / 1000)).toFixed(2) : 'N/A';
+            const avgTPS = elapsedSeconds > 0 ? (totalTicks / elapsedSeconds).toFixed(2) : 'N/A';
 
             return `
                 <div class="report-section">
@@ -1994,7 +1994,7 @@
                     <div class="report-grid">
                         <div class="report-card">
                             <div class="report-card-label">總運行時間</div>
-                            <div class="report-card-value">${(Date.now() / 1000).toFixed(1)}秒</div>
+                            <div class="report-card-value">${Number.isFinite(elapsedSeconds) ? elapsedSeconds.toFixed(1) : 'N/A'}秒</div>
                         </div>
                         <div class="report-card">
                             <div class="report-card-label">總Tick數</div>

@@ -2127,10 +2127,12 @@ async def start_fire_simulation(request: FireSimulationRequest):
         
         # 生成模擬 ID
         simulation_id = f"fire_sim_{str(uuid.uuid4())[:8]}"
+        started_at = asyncio.get_running_loop().time()
         
         # 儲存到活躍模擬中
         active_simulations[simulation_id] = {
             "simulator": simulator,
+            "start_time": started_at,
             "status": "running",
             "tick": 0,
             "agents_data": [],
@@ -2185,6 +2187,8 @@ async def run_fire_simulation_background(simulation_id: str, simulator: FireScen
         
         # 開始模擬循環
         for round_num in range(max_rounds):
+            while sim_data["status"] == "paused":
+                await asyncio.sleep(0.2)
             if sim_data["status"] != "running":
                 break
                 
@@ -2247,7 +2251,7 @@ async def run_fire_simulation_background(simulation_id: str, simulator: FireScen
         # 模擬結束
         if sim_data["status"] == "running":
             sim_data["status"] = "completed"
-            sim_data["finished"] = True
+        sim_data["finished"] = True
             
         # 計算最終統計
         total_agents = len(simulator.agents)
@@ -2399,6 +2403,7 @@ async def run_fire_simulation_background(simulation_id: str, simulator: FireScen
             "escape_rate": escaped_count / total_agents if total_agents > 0 else 0,
             "injury_rate": injured_count / total_agents if total_agents > 0 else 0,
             "total_ticks": simulator.tick,
+            "simulation_time": asyncio.get_running_loop().time() - sim_data["start_time"],
             "total_evacuation_time": last_escape_tick,
             "congestion_events": congestion_events,
             "detailed_agents": detailed_agents_data,
@@ -2413,6 +2418,7 @@ async def run_fire_simulation_background(simulation_id: str, simulator: FireScen
         logger.error(f"火災模擬 {simulation_id} 執行失敗: {e}", exc_info=True)
         sim_data["status"] = "error"
         sim_data["error"] = str(e)
+        sim_data["finished"] = True
 
 @app.get("/simulation-stream/{simulation_id}")
 async def get_simulation_stream(simulation_id: str):
@@ -2437,6 +2443,7 @@ async def get_simulation_stream(simulation_id: str):
             
             last_tick = -1
             last_events_count = 0
+            last_status = None
             heartbeat_counter = 0
             
             while simulation_id in active_simulations:
@@ -2449,13 +2456,16 @@ async def get_simulation_stream(simulation_id: str):
                     # 檢查是否有更新需要發送
                     has_update = (
                         current_tick != last_tick or 
+                        current_status != last_status or
                         len(current_events) > last_events_count or
                         sim_data.get("finished", False)
                     )
                     
                     if has_update:
                         # 準備發送的資料
-                        new_events = current_events[last_events_count:] if len(current_events) > last_events_count else []
+                        # Events are replaced each tick, not a cumulative log.
+                        new_events = (current_events if current_tick != last_tick
+                                      else current_events[last_events_count:])
                         
                         normalized_agents = [
                             _normalize_agent_for_stream(agent)
@@ -2485,9 +2495,10 @@ async def get_simulation_stream(simulation_id: str):
                         
                         last_tick = current_tick
                         last_events_count = len(current_events)
+                        last_status = current_status
                         
-                        # 如果模擬結束
-                        if sim_data.get("finished", False):
+                        # 如果本次送出的快照已結束
+                        if update_data["finished"]:
                             end_data = json.dumps({'message': '模擬結束'}, ensure_ascii=False)
                             yield f"event: simulation_ended\ndata: {end_data}\n\n"
                             logger.info(f"SSE連接 {connection_id} 模擬結束，正常關閉")
